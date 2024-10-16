@@ -35,16 +35,22 @@ bool Server::socketSuccess()
 	return correctSocket;
 }
 
-bool Server::bindSocket()
+void Server::bindSocket()
 {
 	service.sin_family = AF_INET;
 	service.sin_addr.s_addr = inet_addr("127.0.0.1");
 	service.sin_port = htons(55555);
 
-	return false;
+	if (bind(serverSocket, reinterpret_cast<SOCKADDR*>(&service), sizeof(service)) == SOCKET_ERROR) {
+		std::cout << "bind() failed: " << WSAGetLastError() << std::endl;
+		closesocket(serverSocket);
+		WSACleanup();
+	}
+	else 
+	{
+		std::cout << "bind() is OK!" << std::endl;
+	}
 }
- 
-
 
 
 int main()
@@ -52,9 +58,51 @@ int main()
 	Server server;
 	server.serverSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 	server.socketSuccess();
+	server.bindSocket();
 
 
+	if (listen(server.serverSocket, 1) == SOCKET_ERROR) {
+		std::cout << "listen(): Error listening on socket: " << WSAGetLastError() << std::endl;
+	}
+	else {
+		std::cout << "listen() is OK! I'm waiting for new connections..." << std::endl;
+	}
 
+	SOCKET acceptSocket;
+	acceptSocket = accept(server.serverSocket, nullptr, nullptr);
+
+	// Check for successful connection
+	if (acceptSocket == INVALID_SOCKET) {
+		std::cout << "accept failed: " << WSAGetLastError() << std::endl;
+		WSACleanup();
+		return -1;
+	}
+	else {
+		std::cout << "accept() is OK!" << std::endl;
+	}
+
+	char receiveBuffer[200];
+	int rbyteCount = recv(acceptSocket, receiveBuffer, 200, 0);
+	if (rbyteCount < 0) {
+		std::cout << "Server recv error: " << WSAGetLastError() << std::endl;
+		return 0;
+	}
+	else {
+		std::cout << "Received data: " << receiveBuffer << std::endl;
+	}
+
+	// Send a response to the client
+	char buffer[200];
+	std::cout << "Enter the message: ";
+	std::cin.getline(buffer, 200);
+	int sbyteCount = send(acceptSocket, buffer, 200, 0);
+	if (sbyteCount == SOCKET_ERROR) {
+		std::cout << "Server send error: " << WSAGetLastError() << std::endl;
+		return -1;
+	}
+	else {
+		std::cout << "Server: Sent " << sbyteCount << " bytes" << std::endl;
+	}
 	WSACleanup();
 	return 0;
 }
